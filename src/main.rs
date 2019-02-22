@@ -1,10 +1,10 @@
+use std::env;
 use std::io::{self, Read, Write};
-use std::net::{TcpStream, TcpListener};
+use std::net::{IpAddr, Ipv4Addr, SocketAddr, TcpStream, TcpListener};
 use std::num::NonZeroU64;
 use std::time::Duration;
 
 const BUF_SIZE: usize = 8 * 1024;
-const HOST: &str = "127.0.0.1:8080";
 const TIMEOUT: u64 = 15;
 
 fn echo<T: Read + Write>(client: &mut T) -> io::Result<usize> {
@@ -21,22 +21,35 @@ fn echo<T: Read + Write>(client: &mut T) -> io::Result<usize> {
     Ok(written)
 }
 
-fn handle_client(stream: &mut TcpStream, timeout: u64) -> io::Result<usize> {
-    let time = NonZeroU64::new(timeout).map(|n| Duration::from_secs(n.get()));
+fn handle_client(stream: &mut TcpStream) -> io::Result<usize> {
+    let time = NonZeroU64::new(TIMEOUT).map(|n| Duration::from_secs(n.get()));
     stream.set_read_timeout(time)?;
     stream.set_write_timeout(time)?;
     echo(stream)
 }
 
-fn main() {
-    let listener = TcpListener::bind(HOST).expect("Failed to bind socket");
-    println!("Server listening on {}", HOST);
-
+fn run_server(listener: TcpListener) {
+    println!("Server listening on {:?}", listener);
     for client in listener.incoming() {
-        match client.and_then(|mut s| handle_client(&mut s, TIMEOUT)) {
+        match client.and_then(|mut s| handle_client(&mut s)) {
             Ok(n) => println!("Wrote {} bytes", n),
             Err(e) => println!("Error reading/writing stream: {}", e),
         }
+    }
+}
+
+fn main() {
+    let mut args = env::args().skip(1);
+    let addr = args
+        .next()
+        .and_then(|a| a.parse().ok())
+        .unwrap_or(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)));
+    let port = args.next().and_then(|p| p.parse().ok()).unwrap_or(8080);
+    let socket = SocketAddr::new(addr, port);
+
+    match TcpListener::bind(socket) {
+        Ok(listener) => run_server(listener),
+        Err(e) => println!("Failed to bind to socket: {}", e),
     }
 }
 
