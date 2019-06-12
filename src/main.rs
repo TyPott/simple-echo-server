@@ -33,7 +33,7 @@ fn run_server(listener: TcpListener) {
     for client in listener.incoming() {
         match client.and_then(|mut s| handle_client(&mut s)) {
             Ok(n) => println!("Wrote {} bytes", n),
-            Err(e) => println!("Error reading/writing stream: {}", e),
+            Err(e) => eprintln!("Error reading/writing stream: {}", e),
         }
     }
 }
@@ -49,7 +49,7 @@ fn main() {
 
     match TcpListener::bind(socket) {
         Ok(listener) => run_server(listener),
-        Err(e) => println!("Failed to bind to socket: {}", e),
+        Err(e) => eprintln!("Failed to bind to socket: {}", e),
     }
 }
 
